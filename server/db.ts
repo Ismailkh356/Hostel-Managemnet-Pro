@@ -45,17 +45,54 @@ export function initializeDatabase() {
     )
   `);
 
-  // Rooms table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS rooms (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      room_no TEXT NOT NULL UNIQUE,
-      capacity INTEGER NOT NULL,
-      price REAL NOT NULL,
-      occupied INTEGER NOT NULL DEFAULT 0,
-      notes TEXT
-    )
-  `);
+  // Rooms table - migrate from old schema if needed
+  const roomsTableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='rooms'"
+  ).get();
+  
+  if (roomsTableExists) {
+    // Check if old schema exists (has room_no column)
+    const hasOldSchema = db.prepare(
+      "SELECT COUNT(*) as count FROM pragma_table_info('rooms') WHERE name='room_no'"
+    ).get() as { count: number };
+    
+    if (hasOldSchema.count > 0) {
+      // Migrate old schema to new schema
+      db.exec(`
+        CREATE TABLE rooms_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          room_name TEXT NOT NULL UNIQUE,
+          capacity INTEGER NOT NULL,
+          price REAL NOT NULL,
+          status TEXT NOT NULL DEFAULT 'Available',
+          notes TEXT
+        )
+      `);
+      
+      db.exec(`
+        INSERT INTO rooms_new (id, room_name, capacity, price, status, notes)
+        SELECT id, room_no, capacity, price, 
+          CASE WHEN occupied > 0 THEN 'Occupied' ELSE 'Available' END,
+          notes
+        FROM rooms
+      `);
+      
+      db.exec(`DROP TABLE rooms`);
+      db.exec(`ALTER TABLE rooms_new RENAME TO rooms`);
+    }
+  } else {
+    // Create new rooms table with updated schema
+    db.exec(`
+      CREATE TABLE rooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_name TEXT NOT NULL UNIQUE,
+        capacity INTEGER NOT NULL,
+        price REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Available',
+        notes TEXT
+      )
+    `);
+  }
 
   // Payments table
   db.exec(`
@@ -93,6 +130,21 @@ export function initializeDatabase() {
       remarks TEXT
     )
   `);
+
+  // Settings table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hostel_name TEXT NOT NULL DEFAULT 'HostelPro',
+      logo_path TEXT
+    )
+  `);
+
+  // Insert default settings if not exists
+  const settingsCount = db.prepare("SELECT COUNT(*) as count FROM settings").get() as { count: number };
+  if (settingsCount.count === 0) {
+    db.exec(`INSERT INTO settings (hostel_name) VALUES ('HostelPro')`);
+  }
 
   console.log("Database initialized successfully");
 }

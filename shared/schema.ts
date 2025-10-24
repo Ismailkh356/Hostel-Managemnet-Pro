@@ -26,10 +26,10 @@ export const tenants = sqliteTable("tenants", {
 
 export const rooms = sqliteTable("rooms", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  room_no: text("room_no").notNull().unique(),
+  room_name: text("room_name").notNull().unique(),
   capacity: integer("capacity").notNull(),
   price: real("price").notNull(),
-  occupied: integer("occupied").notNull().default(0),
+  status: text("status").notNull().default("Available"),
   notes: text("notes"),
 });
 
@@ -61,6 +61,12 @@ export const maintenance = sqliteTable("maintenance", {
   remarks: text("remarks"),
 });
 
+export const settings = sqliteTable("settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  hostel_name: text("hostel_name").notNull().default("HostelPro"),
+  logo_path: text("logo_path"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -88,6 +94,10 @@ export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
   id: true,
 });
 
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -106,3 +116,6 @@ export type Staff = typeof staff.$inferSelect;
 
 export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
 export type Maintenance = typeof maintenance.$inferSelect;
+
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type Settings = typeof settings.$inferSelect;

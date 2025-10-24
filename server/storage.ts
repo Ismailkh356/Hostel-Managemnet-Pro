@@ -1,4 +1,9 @@
-import { type Tenant, type InsertTenant } from "@shared/schema";
+import { 
+  type Tenant, type InsertTenant,
+  type Room, type InsertRoom,
+  type Settings, type InsertSettings,
+  type Payment, type InsertPayment
+} from "@shared/schema";
 import { db } from "./db";
 
 export interface IStorage {
@@ -8,6 +13,26 @@ export interface IStorage {
   createTenant(tenant: InsertTenant): Tenant;
   updateTenant(id: number, tenant: Partial<InsertTenant>): Tenant | undefined;
   deleteTenant(id: number): boolean;
+
+  // Room operations
+  getRoom(id: number): Room | undefined;
+  getAllRooms(): Room[];
+  createRoom(room: InsertRoom): Room;
+  updateRoom(id: number, room: Partial<InsertRoom>): Room | undefined;
+  deleteRoom(id: number): boolean;
+
+  // Settings operations
+  getSettings(): Settings | undefined;
+  updateSettings(settings: Partial<InsertSettings>): Settings | undefined;
+
+  // Payment operations
+  getPayment(id: number): Payment | undefined;
+  getAllPayments(): Payment[];
+  createPayment(payment: InsertPayment): Payment;
+  updatePayment(id: number, payment: Partial<InsertPayment>): Payment | undefined;
+  deletePayment(id: number): boolean;
+  markPaymentAsPaid(id: number): Payment | undefined;
+  resetAllPayments(): number;
 }
 
 export class SqliteStorage implements IStorage {
@@ -50,6 +75,114 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("DELETE FROM tenants WHERE id = ?");
     const info = stmt.run(id);
     return info.changes > 0;
+  }
+
+  // Room operations
+  getRoom(id: number): Room | undefined {
+    const stmt = db.prepare("SELECT * FROM rooms WHERE id = ?");
+    return stmt.get(id) as Room | undefined;
+  }
+
+  getAllRooms(): Room[] {
+    const stmt = db.prepare("SELECT * FROM rooms ORDER BY room_name");
+    return stmt.all() as Room[];
+  }
+
+  createRoom(room: InsertRoom): Room {
+    const stmt = db.prepare(`
+      INSERT INTO rooms (room_name, capacity, price, status, notes)
+      VALUES (@room_name, @capacity, @price, @status, @notes)
+    `);
+    
+    const info = stmt.run(room);
+    const insertedRoom = this.getRoom(info.lastInsertRowid as number);
+    
+    if (!insertedRoom) {
+      throw new Error("Failed to create room");
+    }
+    
+    return insertedRoom;
+  }
+
+  updateRoom(id: number, room: Partial<InsertRoom>): Room | undefined {
+    const fields = Object.keys(room).map(key => `${key} = @${key}`).join(", ");
+    const stmt = db.prepare(`UPDATE rooms SET ${fields} WHERE id = @id`);
+    
+    stmt.run({ ...room, id });
+    return this.getRoom(id);
+  }
+
+  deleteRoom(id: number): boolean {
+    const stmt = db.prepare("DELETE FROM rooms WHERE id = ?");
+    const info = stmt.run(id);
+    return info.changes > 0;
+  }
+
+  // Settings operations
+  getSettings(): Settings | undefined {
+    const stmt = db.prepare("SELECT * FROM settings LIMIT 1");
+    return stmt.get() as Settings | undefined;
+  }
+
+  updateSettings(settings: Partial<InsertSettings>): Settings | undefined {
+    const fields = Object.keys(settings).map(key => `${key} = @${key}`).join(", ");
+    const stmt = db.prepare(`UPDATE settings SET ${fields} WHERE id = 1`);
+    
+    stmt.run(settings);
+    return this.getSettings();
+  }
+
+  // Payment operations
+  getPayment(id: number): Payment | undefined {
+    const stmt = db.prepare("SELECT * FROM payments WHERE id = ?");
+    return stmt.get(id) as Payment | undefined;
+  }
+
+  getAllPayments(): Payment[] {
+    const stmt = db.prepare("SELECT * FROM payments ORDER BY created_at DESC");
+    return stmt.all() as Payment[];
+  }
+
+  createPayment(payment: InsertPayment): Payment {
+    const stmt = db.prepare(`
+      INSERT INTO payments (tenant_id, amount, month, method, status)
+      VALUES (@tenant_id, @amount, @month, @method, @status)
+    `);
+    
+    const info = stmt.run(payment);
+    const insertedPayment = this.getPayment(info.lastInsertRowid as number);
+    
+    if (!insertedPayment) {
+      throw new Error("Failed to create payment");
+    }
+    
+    return insertedPayment;
+  }
+
+  updatePayment(id: number, payment: Partial<InsertPayment>): Payment | undefined {
+    const fields = Object.keys(payment).map(key => `${key} = @${key}`).join(", ");
+    const stmt = db.prepare(`UPDATE payments SET ${fields} WHERE id = @id`);
+    
+    stmt.run({ ...payment, id });
+    return this.getPayment(id);
+  }
+
+  deletePayment(id: number): boolean {
+    const stmt = db.prepare("DELETE FROM payments WHERE id = ?");
+    const info = stmt.run(id);
+    return info.changes > 0;
+  }
+
+  markPaymentAsPaid(id: number): Payment | undefined {
+    const stmt = db.prepare("UPDATE payments SET status = 'Paid' WHERE id = ?");
+    stmt.run(id);
+    return this.getPayment(id);
+  }
+
+  resetAllPayments(): number {
+    const stmt = db.prepare("UPDATE payments SET status = 'Pending'");
+    const info = stmt.run();
+    return info.changes;
   }
 }
 
