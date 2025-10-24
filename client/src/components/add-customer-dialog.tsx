@@ -68,13 +68,11 @@ export function AddCustomerDialog() {
 
   const createTenantMutation = useMutation({
     mutationFn: async (data: CustomerFormData) => {
-      return apiRequest("/api/tenants", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          rent: parseFloat(data.rent),
-        }),
+      const response = await apiRequest("POST", "/api/tenants", {
+        ...data,
+        rent: parseFloat(data.rent),
       });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
