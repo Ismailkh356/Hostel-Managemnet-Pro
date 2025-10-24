@@ -12,6 +12,7 @@ import Bookings from "@/pages/bookings";
 import Rooms from "@/pages/rooms";
 import Guests from "@/pages/guests";
 import Payments from "@/pages/payments";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/rooms" component={Rooms} />
       <Route path="/guests" component={Guests} />
       <Route path="/payments" component={Payments} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

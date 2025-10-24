@@ -7,6 +7,8 @@ import {
   Settings
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Settings as SettingsType } from "@shared/schema";
 import {
   Sidebar,
   SidebarContent,
@@ -49,13 +51,19 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  
+  const { data: settings } = useQuery<SettingsType>({
+    queryKey: ["/api/settings"],
+  });
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-6">
         <div className="flex items-center gap-2">
           <Bed className="h-6 w-6 text-sidebar-primary" />
-          <span className="text-xl font-semibold">Hostel Manager</span>
+          <span className="text-xl font-semibold" data-testid="text-hostel-name">
+            {settings?.hostel_name || "HostelPro"}
+          </span>
         </div>
       </SidebarHeader>
       <SidebarContent>
