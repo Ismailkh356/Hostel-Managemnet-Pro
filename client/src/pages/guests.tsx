@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { GuestListItem } from "@/components/guest-list-item";
 import { AddCustomerDialog } from "@/components/add-customer-dialog";
+import { CustomerDetailsDialog } from "@/components/customer-details-dialog";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
@@ -16,6 +17,8 @@ import type { Tenant } from "@shared/schema";
 export default function Guests() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedCustomer, setSelectedCustomer] = useState<Tenant | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
     queryKey: ["/api/tenants"],
@@ -27,6 +30,11 @@ export default function Guests() {
     const matchesStatus = statusFilter === "all" || tenant.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleViewProfile = (tenant: Tenant) => {
+    setSelectedCustomer(tenant);
+    setDetailsDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -77,7 +85,7 @@ export default function Guests() {
               phone={tenant.mobile_number}
               totalBookings={0}
               currentStatus={tenant.status === "Active" ? "checked-in" : "checked-out"}
-              onViewProfile={() => console.log("View profile:", tenant.id)}
+              onViewProfile={() => handleViewProfile(tenant)}
             />
           ))}
         </div>
@@ -88,6 +96,12 @@ export default function Guests() {
           <p className="text-muted-foreground">No customers found matching your criteria.</p>
         </div>
       )}
+
+      <CustomerDetailsDialog
+        customer={selectedCustomer}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+      />
     </div>
   );
 }
