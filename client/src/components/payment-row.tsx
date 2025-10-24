@@ -40,7 +40,7 @@ export function PaymentRow({
       
       <div className="flex items-center gap-6">
         <div className="text-right">
-          <p className="font-semibold">${amount.toFixed(2)}</p>
+          <p className="font-semibold">₨{amount.toFixed(2)}</p>
           <p className="text-sm text-muted-foreground">{date}</p>
         </div>
         

@@ -31,7 +31,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Revenue (MTD)"
-          value="$12,450"
+          value="₨12,450"
           icon={DollarSign}
           trend={{ value: "8%", isPositive: true }}
         />

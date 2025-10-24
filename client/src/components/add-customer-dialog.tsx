@@ -29,9 +29,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { Room } from "@shared/schema";
 
 const customerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -50,6 +51,10 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 export function AddCustomerDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  
+  const { data: rooms = [] } = useQuery<Room[]>({
+    queryKey: ["/api/rooms"],
+  });
   
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -192,10 +197,36 @@ export function AddCustomerDialog() {
                 name="room_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Room Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="A12" {...field} data-testid="input-room-number" />
-                    </FormControl>
+                    <FormLabel>Room</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const selectedRoom = rooms.find(r => r.room_name === value);
+                        if (selectedRoom) {
+                          form.setValue("rent", selectedRoom.price.toString());
+                        }
+                      }} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-room-number">
+                          <SelectValue placeholder="Select a room" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {rooms.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            No rooms available. Please add rooms first.
+                          </div>
+                        ) : (
+                          rooms.map((room) => (
+                            <SelectItem key={room.id} value={room.room_name}>
+                              {room.room_name} - ₨{room.price} ({room.status})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -206,7 +237,7 @@ export function AddCustomerDialog() {
                 name="rent"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Rent Amount</FormLabel>
+                    <FormLabel>Rent Amount (₨)</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="12000" {...field} data-testid="input-rent" />
                     </FormControl>
