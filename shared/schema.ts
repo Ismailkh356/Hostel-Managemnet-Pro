@@ -1,18 +1,108 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").notNull().default("staff"),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const tenants = sqliteTable("tenants", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  mobile_number: text("mobile_number").notNull(),
+  cnic: text("cnic").notNull(),
+  father_name: text("father_name").notNull(),
+  father_cnic: text("father_cnic").notNull(),
+  room_number: text("room_number").notNull(),
+  rent: real("rent").notNull(),
+  join_date: text("join_date").notNull(),
+  status: text("status").notNull().default("Active"),
+  created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const rooms = sqliteTable("rooms", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  room_no: text("room_no").notNull().unique(),
+  capacity: integer("capacity").notNull(),
+  price: real("price").notNull(),
+  occupied: integer("occupied").notNull().default(0),
+  notes: text("notes"),
+});
+
+export const payments = sqliteTable("payments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenant_id: integer("tenant_id").notNull(),
+  amount: real("amount").notNull(),
+  month: text("month").notNull(),
+  method: text("method").notNull(),
+  status: text("status").notNull().default("pending"),
+  created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const staff = sqliteTable("staff", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  phone: text("phone").notNull(),
+  salary: real("salary").notNull(),
+  joined_at: text("joined_at").notNull(),
+});
+
+export const maintenance = sqliteTable("maintenance", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  room_id: integer("room_id").notNull(),
+  issue: text("issue").notNull(),
+  date_reported: text("date_reported").notNull(),
+  status: text("status").notNull().default("pending"),
+  remarks: text("remarks"),
+});
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+});
+
+export const insertTenantSchema = createInsertSchema(tenants).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertRoomSchema = createInsertSchema(rooms).omit({
+  id: true,
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertStaffSchema = createInsertSchema(staff).omit({
+  id: true,
+});
+
+export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
+  id: true,
+});
+
+// Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type Tenant = typeof tenants.$inferSelect;
+
+export type InsertRoom = z.infer<typeof insertRoomSchema>;
+export type Room = typeof rooms.$inferSelect;
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+
+export type InsertStaff = z.infer<typeof insertStaffSchema>;
+export type Staff = typeof staff.$inferSelect;
+
+export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
+export type Maintenance = typeof maintenance.$inferSelect;
