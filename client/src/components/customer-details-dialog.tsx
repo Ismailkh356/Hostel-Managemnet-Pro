@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -7,7 +8,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Tenant } from "@shared/schema";
 
 interface CustomerDetailsDialogProps {
@@ -17,6 +32,32 @@ interface CustomerDetailsDialogProps {
 }
 
 export function CustomerDetailsDialog({ customer, open, onOpenChange }: CustomerDetailsDialogProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast } = useToast();
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/tenants/${id}`, undefined);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
+      toast({
+        title: "Success",
+        description: "Customer deleted successfully",
+      });
+      setShowDeleteDialog(false);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete customer",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active":
@@ -154,7 +195,15 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
               )}
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="flex justify-between gap-2">
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                data-testid="button-delete-customer"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Customer
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={() => onOpenChange(false)}
@@ -173,6 +222,29 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
           </DialogHeader>
         )}
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {customer?.name}'s record from the system. 
+              This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => customer && deleteTenantMutation.mutate(customer.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-customer"
+            >
+              {deleteTenantMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
