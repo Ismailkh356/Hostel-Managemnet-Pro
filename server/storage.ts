@@ -2,7 +2,8 @@ import {
   type Tenant, type InsertTenant,
   type Room, type InsertRoom,
   type Settings, type InsertSettings,
-  type Payment, type InsertPayment
+  type Payment, type InsertPayment,
+  type License, type InsertLicense
 } from "@shared/schema";
 import { db } from "./db";
 
@@ -35,6 +36,14 @@ export interface IStorage {
   deletePayment(id: number): boolean;
   markPaymentAsPaid(id: number): Payment | undefined;
   resetAllPayments(): number;
+
+  // License operations
+  getLicenseByKey(licenseKey: string): License | undefined;
+  getActiveLicense(): License | undefined;
+  createLicense(license: InsertLicense): License;
+  activateLicense(licenseKey: string, machineIdHash: string, machineIdSalt: string): License | undefined;
+  deactivateLicense(licenseKey: string): License | undefined;
+  updateLicenseStatus(licenseKey: string, status: string): License | undefined;
 }
 
 export class SqliteStorage implements IStorage {
@@ -197,6 +206,67 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("UPDATE payments SET status = 'Pending'");
     const info = stmt.run();
     return info.changes;
+  }
+
+  // License operations
+  getLicenseByKey(licenseKey: string): License | undefined {
+    const stmt = db.prepare("SELECT * FROM licenses WHERE license_key = ?");
+    return stmt.get(licenseKey) as License | undefined;
+  }
+
+  getActiveLicense(): License | undefined {
+    const stmt = db.prepare("SELECT * FROM licenses WHERE status = 'active' AND machine_id_hash IS NOT NULL LIMIT 1");
+    return stmt.get() as License | undefined;
+  }
+
+  createLicense(license: InsertLicense): License {
+    const stmt = db.prepare(`
+      INSERT INTO licenses (license_key, machine_id_hash, machine_id_salt, customer_name, hostel_name, issue_date, expiry_date, status, notes)
+      VALUES (@license_key, @machine_id_hash, @machine_id_salt, @customer_name, @hostel_name, @issue_date, @expiry_date, @status, @notes)
+    `);
+    
+    const info = stmt.run(license);
+    const insertedLicense = this.getLicenseByKey(license.license_key);
+    
+    if (!insertedLicense) {
+      throw new Error("Failed to create license");
+    }
+    
+    return insertedLicense;
+  }
+
+  activateLicense(licenseKey: string, machineIdHash: string, machineIdSalt: string): License | undefined {
+    const stmt = db.prepare(`
+      UPDATE licenses 
+      SET machine_id_hash = @machineIdHash, 
+          machine_id_salt = @machineIdSalt, 
+          status = 'active', 
+          activated_at = CURRENT_TIMESTAMP 
+      WHERE license_key = @licenseKey
+    `);
+    
+    stmt.run({ licenseKey, machineIdHash, machineIdSalt });
+    return this.getLicenseByKey(licenseKey);
+  }
+
+  deactivateLicense(licenseKey: string): License | undefined {
+    const stmt = db.prepare(`
+      UPDATE licenses 
+      SET machine_id_hash = NULL, 
+          machine_id_salt = NULL, 
+          status = 'pending', 
+          activated_at = NULL 
+      WHERE license_key = @licenseKey
+    `);
+    
+    stmt.run({ licenseKey });
+    return this.getLicenseByKey(licenseKey);
+  }
+
+  updateLicenseStatus(licenseKey: string, status: string): License | undefined {
+    const stmt = db.prepare("UPDATE licenses SET status = @status WHERE license_key = @licenseKey");
+    stmt.run({ licenseKey, status });
+    return this.getLicenseByKey(licenseKey);
   }
 }
 

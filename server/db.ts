@@ -202,6 +202,24 @@ export function initializeDatabase() {
     )
   `);
 
+  // Licenses table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS licenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT NOT NULL UNIQUE,
+      machine_id_hash TEXT,
+      machine_id_salt TEXT,
+      customer_name TEXT NOT NULL,
+      hostel_name TEXT NOT NULL,
+      issue_date TEXT NOT NULL,
+      expiry_date TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      activated_at TEXT
+    )
+  `);
+
   // Insert default settings if not exists
   const settingsCount = db.prepare("SELECT COUNT(*) as count FROM settings").get() as { count: number };
   if (settingsCount.count === 0) {

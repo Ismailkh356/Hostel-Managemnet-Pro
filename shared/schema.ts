@@ -69,6 +69,21 @@ export const settings = sqliteTable("settings", {
   logo_path: text("logo_path"),
 });
 
+export const licenses = sqliteTable("licenses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  license_key: text("license_key").notNull().unique(),
+  machine_id_hash: text("machine_id_hash"),
+  machine_id_salt: text("machine_id_salt"),
+  customer_name: text("customer_name").notNull(),
+  hostel_name: text("hostel_name").notNull(),
+  issue_date: text("issue_date").notNull(),
+  expiry_date: text("expiry_date"),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+  activated_at: text("activated_at"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -100,6 +115,12 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
   id: true,
 });
 
+export const insertLicenseSchema = createInsertSchema(licenses).omit({
+  id: true,
+  created_at: true,
+  activated_at: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -121,3 +142,6 @@ export type Maintenance = typeof maintenance.$inferSelect;
 
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type Settings = typeof settings.$inferSelect;
+
+export type InsertLicense = z.infer<typeof insertLicenseSchema>;
+export type License = typeof licenses.$inferSelect;
