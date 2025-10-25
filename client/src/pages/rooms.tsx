@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Room } from "@shared/schema";
+import type { Room, Tenant } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -56,10 +56,15 @@ export default function Rooms() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
+  const [viewingRoom, setViewingRoom] = useState<Room | null>(null);
   const { toast } = useToast();
 
   const { data: rooms = [], isLoading } = useQuery<Room[]>({
     queryKey: ["/api/rooms"],
+  });
+
+  const { data: tenants = [] } = useQuery<Tenant[]>({
+    queryKey: ["/api/tenants"],
   });
 
   const [formData, setFormData] = useState<RoomFormData>({
@@ -178,6 +183,10 @@ export default function Rooms() {
       status: room.status,
       notes: room.notes || "",
     });
+  };
+
+  const getTenantsInRoom = (roomName: string) => {
+    return tenants.filter((tenant) => tenant.room_number === roomName && tenant.status === "Active");
   };
 
   const filteredRooms = rooms.filter((room) => {
@@ -384,25 +393,37 @@ export default function Rooms() {
                   )}
                 </CardDescription>
               </CardContent>
-              <CardFooter className="gap-2">
+              <CardFooter className="flex-col gap-2">
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="flex-1"
-                  onClick={() => handleEdit(room)}
-                  data-testid={`button-edit-room-${room.id}`}
+                  className="w-full"
+                  onClick={() => setViewingRoom(room)}
+                  data-testid={`button-view-tenants-${room.id}`}
                 >
-                  Edit
+                  <Users className="mr-2 h-4 w-4" />
+                  View Tenants ({getTenantsInRoom(room.room_name).length})
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setDeletingRoom(room)}
-                  data-testid={`button-delete-room-${room.id}`}
-                >
-                  Delete
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEdit(room)}
+                    data-testid={`button-edit-room-${room.id}`}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setDeletingRoom(room)}
+                    data-testid={`button-delete-room-${room.id}`}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </CardFooter>
             </Card>
           ))}
@@ -511,6 +532,39 @@ export default function Rooms() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Tenants Dialog */}
+      <Dialog open={!!viewingRoom} onOpenChange={(open) => !open && setViewingRoom(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tenants in Room {viewingRoom?.room_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {viewingRoom && getTenantsInRoom(viewingRoom.room_name).length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No tenants currently in this room</p>
+              </div>
+            ) : (
+              <div className="space-y-2" data-testid="tenants-list">
+                {viewingRoom && getTenantsInRoom(viewingRoom.room_name).map((tenant) => (
+                  <div
+                    key={tenant.id}
+                    className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                    data-testid={`tenant-item-${tenant.id}`}
+                  >
+                    <span className="font-medium" data-testid={`tenant-name-${tenant.id}`}>
+                      {tenant.name}
+                    </span>
+                    <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
+                      Active
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
