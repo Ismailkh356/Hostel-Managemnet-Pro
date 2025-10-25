@@ -6,7 +6,8 @@ import {
   insertRoomSchema, 
   insertSettingsSchema,
   insertPaymentSchema,
-  insertLicenseSchema 
+  insertLicenseSchema,
+  insertAdminUserSchema 
 } from "@shared/schema";
 import { z } from "zod";
 import { createBackup, getBackupInfo } from "./backup";
@@ -21,8 +22,228 @@ import {
   clearLicenseCache,
   type ValidationResult
 } from "./license-service";
+import {
+  hashPassword,
+  comparePassword,
+  isAccountLocked,
+  getLockExpiryTime,
+  shouldLockAccount,
+  requireAuth,
+  type AuthenticatedRequest
+} from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication Routes
+  
+  // GET /api/auth/status - Check if admin account exists and if user is logged in
+  app.get("/api/auth/status", async (req, res) => {
+    try {
+      const hasAdmin = storage.hasAdminAccount();
+      const authReq = req as AuthenticatedRequest;
+      const isLoggedIn = !!(authReq.session && authReq.session.adminId);
+      
+      res.json({
+        hasAdminAccount: hasAdmin,
+        isAuthenticated: isLoggedIn,
+        username: authReq.session?.username || null
+      });
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      res.status(500).json({ error: "Failed to check auth status" });
+    }
+  });
+
+  // POST /api/auth/setup - Create first admin account
+  app.post("/api/auth/setup", async (req, res) => {
+    try {
+      // Check if admin account already exists
+      if (storage.hasAdminAccount()) {
+        return res.status(400).json({ error: "Admin account already exists" });
+      }
+
+      const setupSchema = z.object({
+        username: z.string().min(3).max(50),
+        password: z.string().min(6),
+        confirmPassword: z.string()
+      }).refine((data) => data.password === data.confirmPassword, {
+        message: "Passwords do not match",
+        path: ["confirmPassword"]
+      });
+
+      const { username, password } = setupSchema.parse(req.body);
+
+      // Hash password
+      const passwordHash = await hashPassword(password);
+
+      // Create admin user
+      const admin = storage.createAdminUser({
+        username,
+        password_hash: passwordHash
+      });
+
+      // Log in the admin immediately
+      const authReq = req as AuthenticatedRequest;
+      authReq.session.adminId = admin.id;
+      authReq.session.username = admin.username;
+
+      res.json({
+        message: "Admin account created successfully",
+        username: admin.username
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+
+      console.error("Error creating admin account:", error);
+      res.status(500).json({ error: "Failed to create admin account" });
+    }
+  });
+
+  // POST /api/auth/login - Admin login
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const loginSchema = z.object({
+        username: z.string(),
+        password: z.string()
+      });
+
+      const { username, password } = loginSchema.parse(req.body);
+
+      // Get admin user
+      const admin = storage.getAdminByUsername(username);
+
+      if (!admin) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      // Check if account is locked
+      if (isAccountLocked(admin.locked_until)) {
+        return res.status(403).json({ 
+          error: "Account is locked due to too many failed login attempts. Please try again in 5 minutes." 
+        });
+      }
+
+      // Verify password
+      const isValid = await comparePassword(password, admin.password_hash);
+
+      if (!isValid) {
+        // Increment failed login attempts
+        storage.incrementFailedLoginAttempts(username);
+
+        // Check if we should lock the account
+        const updatedAdmin = storage.getAdminByUsername(username);
+        if (updatedAdmin && shouldLockAccount(updatedAdmin.failed_login_attempts)) {
+          const lockUntil = getLockExpiryTime();
+          storage.lockAdmin(username, lockUntil);
+        }
+
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      // Reset failed login attempts
+      storage.resetFailedLoginAttempts(username);
+
+      // Update last login
+      storage.updateLastLogin(username);
+
+      // Set session
+      const authReq = req as AuthenticatedRequest;
+      authReq.session.adminId = admin.id;
+      authReq.session.username = admin.username;
+
+      res.json({
+        message: "Login successful",
+        username: admin.username
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+
+      console.error("Error during login:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // POST /api/auth/logout - Admin logout
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      authReq.session.destroy((err) => {
+        if (err) {
+          console.error("Error destroying session:", err);
+          return res.status(500).json({ error: "Logout failed" });
+        }
+        res.json({ message: "Logout successful" });
+      });
+    } catch (error) {
+      console.error("Error during logout:", error);
+      res.status(500).json({ error: "Logout failed" });
+    }
+  });
+
+  // POST /api/auth/change-password - Change admin password (requires authentication)
+  app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const username = authReq.session.username;
+
+      if (!username) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const changePasswordSchema = z.object({
+        currentPassword: z.string(),
+        newPassword: z.string().min(6),
+        confirmPassword: z.string()
+      }).refine((data) => data.newPassword === data.confirmPassword, {
+        message: "Passwords do not match",
+        path: ["confirmPassword"]
+      });
+
+      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+
+      // Get admin user
+      const admin = storage.getAdminByUsername(username);
+
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      // Verify current password
+      const isValid = await comparePassword(currentPassword, admin.password_hash);
+
+      if (!isValid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      // Hash new password
+      const newPasswordHash = await hashPassword(newPassword);
+
+      // Update password
+      storage.updateAdminPassword(username, newPasswordHash);
+
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+
+      console.error("Error changing password:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // Tenant Routes
   
   // GET /api/tenants - Get all tenants
