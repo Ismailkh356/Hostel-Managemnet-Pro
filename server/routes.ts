@@ -5,10 +5,22 @@ import {
   insertTenantSchema, 
   insertRoomSchema, 
   insertSettingsSchema,
-  insertPaymentSchema 
+  insertPaymentSchema,
+  insertLicenseSchema 
 } from "@shared/schema";
 import { z } from "zod";
 import { createBackup, getBackupInfo } from "./backup";
+import {
+  getMachineId,
+  generateSalt,
+  hashMachineId,
+  generateLicenseKey,
+  checkExpiry,
+  encryptLicenseCache,
+  decryptLicenseCache,
+  clearLicenseCache,
+  type ValidationResult
+} from "./license-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Tenant Routes
@@ -403,6 +415,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating backup:", error);
       res.status(500).json({ error: "Failed to create backup" });
+    }
+  });
+
+  // License Routes
+
+  // GET /api/machine-id - Get current machine ID
+  app.get("/api/machine-id", (req, res) => {
+    try {
+      const machineId = getMachineId();
+      res.json({ machine_id: machineId });
+    } catch (error) {
+      console.error("Error getting machine ID:", error);
+      res.status(500).json({ error: "Failed to get machine ID" });
+    }
+  });
+
+  // GET /api/license - Get active license information
+  app.get("/api/license", async (req, res) => {
+    try {
+      const license = storage.getActiveLicense();
+      
+      if (!license) {
+        return res.status(404).json({ error: "No active license found" });
+      }
+
+      res.json({
+        license_key: license.license_key,
+        customer_name: license.customer_name,
+        hostel_name: license.hostel_name,
+        status: license.status,
+        issue_date: license.issue_date,
+        expiry_date: license.expiry_date,
+        activated_at: license.activated_at,
+      });
+    } catch (error) {
+      console.error("Error fetching license:", error);
+      res.status(500).json({ error: "Failed to fetch license information" });
+    }
+  });
+
+  // POST /api/license/validate - Validate and activate license
+  app.post("/api/license/validate", async (req, res) => {
+    try {
+      const schema = z.object({
+        license_key: z.string(),
+        machine_id: z.string(),
+      });
+
+      const { license_key, machine_id } = schema.parse(req.body);
+
+      const license = storage.getLicenseByKey(license_key);
+
+      if (!license) {
+        return res.json({
+          valid: false,
+          message: "Invalid license key",
+        } as ValidationResult);
+      }
+
+      if (license.status === "suspended" || license.status === "revoked") {
+        return res.json({
+          valid: false,
+          message: "This license has been suspended or revoked. Please contact support.",
+        } as ValidationResult);
+      }
+
+      if (license.expiry_date && checkExpiry(license.expiry_date)) {
+        storage.updateLicenseStatus(license_key, "expired");
+        return res.json({
+          valid: false,
+          message: "License has expired",
+        } as ValidationResult);
+      }
+
+      if (!license.machine_id_hash) {
+        const salt = generateSalt();
+        const hash = hashMachineId(machine_id, salt);
+        storage.activateLicense(license_key, hash, salt);
+
+        const machineId = getMachineId();
+        await encryptLicenseCache(
+          {
+            license_key: license.license_key,
+            hostel_name: license.hostel_name,
+            customer_name: license.customer_name,
+            activated_at: new Date().toISOString(),
+            expiry_date: license.expiry_date,
+            machine_id_hash: hash,
+          },
+          machineId
+        );
+
+        return res.json({
+          valid: true,
+          message: "License activated successfully",
+          hostel_name: license.hostel_name,
+          customer_name: license.customer_name,
+          license_key: license.license_key,
+          expiry_date: license.expiry_date,
+          status: "active",
+        } as ValidationResult);
+      } else {
+        const hash = hashMachineId(machine_id, license.machine_id_salt!);
+        
+        if (hash !== license.machine_id_hash) {
+          return res.json({
+            valid: false,
+            message: "License is already activated on a different machine",
+          } as ValidationResult);
+        }
+
+        return res.json({
+          valid: true,
+          message: "License is valid",
+          hostel_name: license.hostel_name,
+          customer_name: license.customer_name,
+          license_key: license.license_key,
+          expiry_date: license.expiry_date,
+          status: license.status,
+        } as ValidationResult);
+      }
+    } catch (error) {
+      console.error("Error validating license:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      res.status(500).json({ error: "Failed to validate license" });
+    }
+  });
+
+  // POST /api/license/generate - Generate new license (admin only)
+  app.post("/api/license/generate", async (req, res) => {
+    try {
+      const schema = insertLicenseSchema.extend({
+        admin_secret: z.string(),
+      });
+
+      const data = schema.parse(req.body);
+
+      const ADMIN_SECRET = process.env.ADMIN_SECRET || "your-secret-admin-key-change-this";
+      
+      if (data.admin_secret !== ADMIN_SECRET) {
+        return res.status(403).json({ error: "Unauthorized: Invalid admin secret" });
+      }
+
+      const licenseKey = generateLicenseKey();
+      const issueDate = new Date().toISOString();
+
+      const newLicense = storage.createLicense({
+        license_key: licenseKey,
+        machine_id_hash: null,
+        machine_id_salt: null,
+        customer_name: data.customer_name,
+        hostel_name: data.hostel_name,
+        issue_date: issueDate,
+        expiry_date: data.expiry_date || null,
+        status: "pending",
+        notes: data.notes || null,
+      });
+
+      res.json({
+        message: "License generated successfully",
+        license: {
+          license_key: newLicense.license_key,
+          customer_name: newLicense.customer_name,
+          hostel_name: newLicense.hostel_name,
+          issue_date: newLicense.issue_date,
+          expiry_date: newLicense.expiry_date,
+          status: newLicense.status,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating license:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to generate license" });
+    }
+  });
+
+  // POST /api/license/deactivate - Deactivate current license
+  app.post("/api/license/deactivate", async (req, res) => {
+    try {
+      const schema = z.object({
+        license_key: z.string(),
+      });
+
+      const { license_key } = schema.parse(req.body);
+
+      const license = storage.getLicenseByKey(license_key);
+
+      if (!license) {
+        return res.status(404).json({ error: "License not found" });
+      }
+
+      storage.deactivateLicense(license_key);
+      await clearLicenseCache();
+
+      res.json({
+        message: "License deactivated successfully",
+      });
+    } catch (error) {
+      console.error("Error deactivating license:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      res.status(500).json({ error: "Failed to deactivate license" });
     }
   });
 
