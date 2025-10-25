@@ -548,7 +548,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/license/generate - Generate new license (admin only)
   app.post("/api/license/generate", async (req, res) => {
     try {
-      const schema = insertLicenseSchema.extend({
+      const schema = z.object({
+        customer_name: z.string(),
+        hostel_name: z.string(),
+        expiry_date: z.string().nullable().optional(),
+        notes: z.string().optional(),
         admin_secret: z.string(),
       });
 
