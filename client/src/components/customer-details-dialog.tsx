@@ -50,9 +50,6 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                   </h3>
                   <p className="text-sm text-muted-foreground">Customer ID: {customer.id}</p>
                 </div>
-                <Badge className={getStatusColor(customer.status)} data-testid="badge-customer-status">
-                  {customer.status}
-                </Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -87,6 +84,13 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                 </div>
               </div>
 
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Occupation</p>
+                <p className="text-base" data-testid="text-customer-occupation">
+                  {customer.occupation}
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Room Number</p>
@@ -100,6 +104,26 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                   <p className="text-base font-semibold" data-testid="text-customer-rent">
                     ₨{customer.rent.toFixed(2)}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Payment Status</p>
+                  <Badge className={
+                    customer.payment_status === "Paid"
+                      ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                      : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+                  } data-testid="badge-customer-payment-status">
+                    {customer.payment_status}
+                  </Badge>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Tenant Status</p>
+                  <Badge className={getStatusColor(customer.status)} data-testid="badge-customer-tenant-status">
+                    {customer.status}
+                  </Badge>
                 </div>
               </div>
 

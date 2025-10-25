@@ -28,22 +28,84 @@ export function initializeDatabase() {
     )
   `);
 
-  // Tenants table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tenants (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      mobile_number TEXT NOT NULL,
-      cnic TEXT NOT NULL,
-      father_name TEXT NOT NULL,
-      father_cnic TEXT NOT NULL,
-      room_number TEXT NOT NULL,
-      rent REAL NOT NULL,
-      join_date TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'Active',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  // Tenants table - migrate to add occupation and payment_status if needed
+  const tenantsTableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='tenants'"
+  ).get();
+  
+  if (tenantsTableExists) {
+    // Check if occupation column exists
+    const hasOccupation = db.prepare(
+      "SELECT COUNT(*) as count FROM pragma_table_info('tenants') WHERE name='occupation'"
+    ).get() as { count: number };
+    
+    const hasPaymentStatus = db.prepare(
+      "SELECT COUNT(*) as count FROM pragma_table_info('tenants') WHERE name='payment_status'"
+    ).get() as { count: number };
+    
+    if (hasOccupation.count === 0 || hasPaymentStatus.count === 0) {
+      // Migrate existing table
+      db.exec(`
+        CREATE TABLE tenants_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          mobile_number TEXT NOT NULL,
+          cnic TEXT NOT NULL,
+          father_name TEXT NOT NULL,
+          father_cnic TEXT NOT NULL,
+          occupation TEXT NOT NULL DEFAULT '',
+          room_number TEXT NOT NULL,
+          rent REAL NOT NULL,
+          join_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'Active',
+          payment_status TEXT NOT NULL DEFAULT 'Pending',
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      // Copy data, setting defaults for new columns
+      if (hasOccupation.count === 0 && hasPaymentStatus.count === 0) {
+        db.exec(`
+          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
+          SELECT id, name, mobile_number, cnic, father_name, father_cnic, '', room_number, rent, join_date, status, 'Pending', created_at
+          FROM tenants
+        `);
+      } else if (hasOccupation.count === 0) {
+        db.exec(`
+          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
+          SELECT id, name, mobile_number, cnic, father_name, father_cnic, '', room_number, rent, join_date, status, payment_status, created_at
+          FROM tenants
+        `);
+      } else {
+        db.exec(`
+          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
+          SELECT id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, 'Pending', created_at
+          FROM tenants
+        `);
+      }
+      
+      db.exec(`DROP TABLE tenants`);
+      db.exec(`ALTER TABLE tenants_new RENAME TO tenants`);
+    }
+  } else {
+    db.exec(`
+      CREATE TABLE tenants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        mobile_number TEXT NOT NULL,
+        cnic TEXT NOT NULL,
+        father_name TEXT NOT NULL,
+        father_cnic TEXT NOT NULL,
+        occupation TEXT NOT NULL,
+        room_number TEXT NOT NULL,
+        rent REAL NOT NULL,
+        join_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Active',
+        payment_status TEXT NOT NULL DEFAULT 'Pending',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
 
   // Rooms table - migrate from old schema if needed
   const roomsTableExists = db.prepare(

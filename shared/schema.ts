@@ -17,10 +17,12 @@ export const tenants = sqliteTable("tenants", {
   cnic: text("cnic").notNull(),
   father_name: text("father_name").notNull(),
   father_cnic: text("father_cnic").notNull(),
+  occupation: text("occupation").notNull(),
   room_number: text("room_number").notNull(),
   rent: real("rent").notNull(),
   join_date: text("join_date").notNull(),
   status: text("status").notNull().default("Active"),
+  payment_status: text("payment_status").notNull().default("Pending"),
   created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -40,10 +40,12 @@ const customerSchema = z.object({
   cnic: z.string().min(13, "Valid CNIC is required"),
   father_name: z.string().min(2, "Father's name is required"),
   father_cnic: z.string().min(13, "Father's CNIC is required"),
+  occupation: z.string().min(2, "Occupation is required"),
   room_number: z.string().min(1, "Room number is required"),
   rent: z.string().min(1, "Rent amount is required"),
   join_date: z.string().min(1, "Join date is required"),
   status: z.string().default("Active"),
+  payment_status: z.string().default("Pending"),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
@@ -64,10 +66,12 @@ export function AddCustomerDialog() {
       cnic: "",
       father_name: "",
       father_cnic: "",
+      occupation: "",
       room_number: "",
       rent: "",
       join_date: "",
       status: "Active",
+      payment_status: "Pending",
     },
   });
 
@@ -185,6 +189,20 @@ export function AddCustomerDialog() {
                   <FormLabel>Father's CNIC</FormLabel>
                   <FormControl>
                     <Input placeholder="35202-9876543-2" {...field} data-testid="input-father-cnic" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="occupation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Occupation</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Student, Engineer, etc." {...field} data-testid="input-occupation" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

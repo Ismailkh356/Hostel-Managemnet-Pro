@@ -1,6 +1,5 @@
 import { 
   LayoutDashboard, 
-  Calendar, 
   Bed, 
   Users, 
   Receipt,
@@ -26,11 +25,6 @@ const menuItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Bookings",
-    url: "/bookings",
-    icon: Calendar,
   },
   {
     title: "Rooms",

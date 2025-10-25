@@ -115,6 +115,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PUT /api/tenants/:id/mark-paid - Mark tenant payment as paid
+  app.put("/api/tenants/:id/mark-paid", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedTenant = storage.markTenantPaymentAsPaid(id);
+      
+      if (!updatedTenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      res.json({
+        message: "Tenant payment marked as paid",
+        data: updatedTenant
+      });
+    } catch (error) {
+      console.error("Error marking tenant payment as paid:", error);
+      res.status(500).json({ error: "Failed to mark payment as paid" });
+    }
+  });
+
+  // PUT /api/tenants/:id/mark-pending - Mark tenant payment as pending
+  app.put("/api/tenants/:id/mark-pending", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedTenant = storage.markTenantPaymentAsPending(id);
+      
+      if (!updatedTenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      res.json({
+        message: "Tenant payment marked as pending",
+        data: updatedTenant
+      });
+    } catch (error) {
+      console.error("Error marking tenant payment as pending:", error);
+      res.status(500).json({ error: "Failed to mark payment as pending" });
+    }
+  });
+
   // Room Routes
   
   // GET /api/rooms - Get all rooms

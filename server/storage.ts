@@ -13,6 +13,8 @@ export interface IStorage {
   createTenant(tenant: InsertTenant): Tenant;
   updateTenant(id: number, tenant: Partial<InsertTenant>): Tenant | undefined;
   deleteTenant(id: number): boolean;
+  markTenantPaymentAsPaid(id: number): Tenant | undefined;
+  markTenantPaymentAsPending(id: number): Tenant | undefined;
 
   // Room operations
   getRoom(id: number): Room | undefined;
@@ -49,8 +51,8 @@ export class SqliteStorage implements IStorage {
 
   createTenant(tenant: InsertTenant): Tenant {
     const stmt = db.prepare(`
-      INSERT INTO tenants (name, mobile_number, cnic, father_name, father_cnic, room_number, rent, join_date, status)
-      VALUES (@name, @mobile_number, @cnic, @father_name, @father_cnic, @room_number, @rent, @join_date, @status)
+      INSERT INTO tenants (name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status)
+      VALUES (@name, @mobile_number, @cnic, @father_name, @father_cnic, @occupation, @room_number, @rent, @join_date, @status, @payment_status)
     `);
     
     const info = stmt.run(tenant);
@@ -75,6 +77,18 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("DELETE FROM tenants WHERE id = ?");
     const info = stmt.run(id);
     return info.changes > 0;
+  }
+
+  markTenantPaymentAsPaid(id: number): Tenant | undefined {
+    const stmt = db.prepare("UPDATE tenants SET payment_status = 'Paid' WHERE id = ?");
+    stmt.run(id);
+    return this.getTenant(id);
+  }
+
+  markTenantPaymentAsPending(id: number): Tenant | undefined {
+    const stmt = db.prepare("UPDATE tenants SET payment_status = 'Pending' WHERE id = ?");
+    stmt.run(id);
+    return this.getTenant(id);
   }
 
   // Room operations
