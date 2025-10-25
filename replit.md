@@ -179,3 +179,129 @@ Preferred communication style: Simple, everyday language.
 
 ### Session Management
 - **connect-pg-simple** - PostgreSQL session store (configured but may not be actively used with SQLite setup)
+
+### Security & Licensing
+- **node-machine-id** - Hardware-based machine identification for license binding
+- **uuid** - License key generation
+- **crypto** (Node.js built-in) - AES-256-GCM encryption for local license cache
+
+## Software Licensing System
+
+HostelPro Local includes a comprehensive software licensing and machine ID protection system to prevent unauthorized usage and license sharing.
+
+### License Architecture
+
+**License Binding**
+- Each license is cryptographically bound to a specific machine using hardware-based machine ID
+- Machine IDs are hashed with SHA-256 and per-license random salts before storage
+- License files cannot be copied between machines due to encrypted local cache
+
+**Encrypted Local Cache**
+- Active license stored in `.license/license.json.enc` (encrypted with AES-256-GCM)
+- Encryption key derived from machine ID using PBKDF2-SHA256 (100,000 iterations)
+- Cache provides offline validation after initial activation
+- Tamper detection via GCM authentication tag
+
+**License Status Flow**
+1. `pending` - License generated but not yet activated
+2. `active` - License successfully activated and bound to machine
+3. `deactivated` - License manually deactivated (can be reactivated on same machine)
+4. `expired` - License past expiry date (if expiry_date is set)
+
+### Database Schema
+
+**licenses table**
+- `id` - Auto-incrementing primary key
+- `license_key` - Unique license identifier (format: HOSTELPRO-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX)
+- `machine_id_hash` - SHA-256 hash of machine ID + salt (null until activated)
+- `machine_id_salt` - Random salt for machine ID hashing (null until activated)
+- `customer_name` - Name of licensed customer/organization
+- `hostel_name` - Name of the hostel using the software
+- `issue_date` - ISO timestamp when license was generated
+- `expiry_date` - ISO timestamp when license expires (null for lifetime licenses)
+- `status` - Current license status (pending/active/deactivated/expired)
+- `notes` - Optional internal notes about the license
+- `activated_at` - ISO timestamp when license was first activated
+
+### API Endpoints
+
+**License Validation & Activation**
+- `GET /api/machine-id` - Retrieve current machine's hardware ID
+- `GET /api/license` - Get active license for current machine (returns 404 if none)
+- `POST /api/license/validate` - Validate and activate a license key
+  - Request: `{ license_key: string, machine_id: string }`
+  - Validates license exists, not expired, and binds to machine on first activation
+  - Creates encrypted local cache for offline validation
+- `POST /api/license/deactivate` - Deactivate current machine's license
+  - Clears machine binding and removes local cache
+  - License can be reactivated on same machine
+
+**License Management (Admin Only)**
+- `POST /api/license/generate` - Generate new license
+  - Requires `ADMIN_SECRET` environment variable for authentication
+  - Request: `{ customer_name, hostel_name, expiry_date?, notes?, admin_secret }`
+  - Returns newly generated license key
+
+### Frontend Components
+
+**Activation Flow**
+- `ActivationPage` (`/activation`) - Initial activation screen shown when no valid license exists
+  - Displays current machine ID for support purposes
+  - Accepts license key input
+  - Validates and activates license via API
+  - Redirects to dashboard on success
+
+**License Information Display**
+- Settings page includes License Information section
+- Shows: license key, customer name, hostel name, status badge, issue date, activation date, expiry date
+- Visual status indicator (green for Active, yellow for Pending, red for Expired/Deactivated)
+
+**App Startup Validation**
+- `App.tsx` checks for valid license on every startup via `useLicense` hook
+- Blocks access to main application until license is activated
+- Handles expired licenses and missing cache gracefully
+
+### Security Features
+
+**Protection Against License Sharing**
+- Machine ID binding prevents copying license to different hardware
+- Encrypted cache uses hardware-specific encryption key
+- Server validates machine ID match on every activation attempt
+- Single active license per machine enforced
+
+**Admin Controls**
+- License generation restricted to authorized users with admin secret
+- Admin secret must be set via `ADMIN_SECRET` environment variable
+- Default value: "your-secret-admin-key-change-this" (should be changed in production)
+
+**Offline Validation**
+- After initial activation, license validated from encrypted local cache
+- No internet required for daily operation
+- Cache encrypted to prevent tampering
+- Falls back to server validation if cache is corrupted or missing
+
+### License Key Format
+
+License keys follow the format: `HOSTELPRO-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`
+- Prefix: "HOSTELPRO-"
+- Four groups of 8 hexadecimal characters
+- Example: `HOSTELPRO-3C56E1A2-3F6CF11E-DC9A0FFF-576312EE`
+
+### Operational Notes
+
+**Initial Setup**
+1. Generate license using admin API endpoint with valid admin secret
+2. Provide license key to customer
+3. Customer enters license key in activation screen
+4. System binds license to machine and creates encrypted cache
+5. Application grants access to main features
+
+**License Recovery**
+- If encrypted cache is lost or corrupted, customer must re-enter license key
+- Same license key will work on the same machine (machine ID match)
+- Cannot use license on different machine if already activated elsewhere
+
+**Expiry Handling**
+- Lifetime licenses: `expiry_date` is null
+- Timed licenses: System checks expiry on startup and blocks access if expired
+- Grace period: None - expired licenses immediately block access
