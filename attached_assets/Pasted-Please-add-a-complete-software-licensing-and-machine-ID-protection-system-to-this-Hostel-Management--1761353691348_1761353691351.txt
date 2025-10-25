@@ -1,0 +1,101 @@
+Please add a complete software licensing and machine ID protection system to this Hostel Management application.
+
+🧩 Goal:
+I want to protect the app from illegal reselling or sharing. Each license should only work on the machine (PC) where it’s activated.
+
+🧠 System Overview:
+The app should use a **license key + machine ID** system to validate access.
+
+---
+
+### 🔒 Backend (License Validation API)
+1. Create a new SQLite table named `licenses` with the following columns:
+   - id (auto increment)
+   - license_key (unique)
+   - machine_id (nullable at first)
+   - customer_name
+   - hostel_name
+   - issue_date
+   - expiry_date (can be NULL for lifetime)
+   - status (active, blocked, expired)
+   - notes
+
+2. Add an API route `/api/license/validate` that:
+   - Receives: `{ license_key, machine_id }`
+   - Checks:
+     - If license exists and status = active.
+     - If no machine_id is yet linked → link it to the given machine_id.
+     - If machine_id is already linked but different → reject access.
+     - If expiry_date has passed → reject.
+   - Returns JSON:
+     ```json
+     {
+       "valid": true,
+       "message": "License valid and activated",
+       "hostel_name": "Bilawal Hostel"
+     }
+     ```
+     or if invalid:
+     ```json
+     {
+       "valid": false,
+       "message": "License invalid or expired"
+     }
+     ```
+
+3. Add a small CLI script or admin route to generate a new license:
+   - Auto-generate unique `license_key` (UUID format)
+   - Store it with customer info
+   - Example license key: `HOSTELPRO-8F3A-91K2-7B5Z-9M2D`
+
+---
+
+### 🧮 Frontend / Desktop App Behavior
+1. On first run:
+   - Show an “Activation Window”.
+   - Ask for:
+     - License Key
+     - Customer Name
+   - Auto-detect **Machine ID** using OS info (like hostname + CPU serial, or simple hash via Node module `node-machine-id`).
+   - Send this info to `/api/license/validate`.
+
+2. If the license is valid:
+   - Save activation info locally (e.g., `license.json` file) so it doesn’t ask again.
+   - Show the dashboard normally.
+
+3. If invalid:
+   - Block access with a friendly message:
+     “Your license is invalid or has expired. Please contact support to renew.”
+
+4. Add a “License Info” section under Settings:
+   - Show License Key
+   - Activation Date
+   - Expiry Date (if any)
+   - Machine ID
+   - Status
+
+---
+
+### 💡 Extra Security Enhancements:
+- Encrypt local `license.json` file so users cannot easily copy it.
+- Hash the machine_id before storing it (SHA256 or MD5).
+- If the app detects a license mismatch, automatically log out and show “Unauthorized Installation”.
+- Optional: Allow “Trial Mode” for 3 days if no valid license exists.
+
+---
+
+### 🧰 Modules / Libraries Suggested:
+- `node-machine-id` for generating machine ID.
+- `crypto` for hashing / encrypting.
+- `uuid` for generating license keys.
+- `better-sqlite3` or `sqlite3` for local storage.
+
+---
+
+### ✅ Final Goal:
+When I sell the software for a one-time price (e.g., PKR 30,000), I want:
+- To generate one license per client.
+- The client can install and activate on only one machine.
+- If they copy the software to another machine, it should show “Invalid License”.
+- Admin (me) can disable or block any license from the database later.
+
