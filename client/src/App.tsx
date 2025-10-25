@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -15,6 +15,8 @@ import Payments from "@/pages/payments";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import ActivationPage from "@/pages/activation";
+import AdminSetup from "@/pages/admin-setup";
+import AdminLogin from "@/pages/admin-login";
 import { useLicense } from "@/hooks/use-license";
 
 function Router() {
@@ -30,16 +32,35 @@ function Router() {
   );
 }
 
+interface AuthStatus {
+  hasAdminAccount: boolean;
+  isAuthenticated: boolean;
+  username: string | null;
+}
+
 function AppContent() {
-  const { hasLicense, isLoading, refetch } = useLicense();
+  const { hasLicense, isLoading: licenseLoading, refetch: refetchLicense } = useLicense();
   const [isActivated, setIsActivated] = useState(false);
+
+  const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<AuthStatus>({
+    queryKey: ["/api/auth/status"],
+    enabled: hasLicense || isActivated
+  });
 
   const handleActivationSuccess = () => {
     setIsActivated(true);
-    refetch();
+    refetchLicense();
   };
 
-  if (isLoading) {
+  const handleSetupComplete = () => {
+    refetchAuth();
+  };
+
+  const handleLoginSuccess = () => {
+    refetchAuth();
+  };
+
+  if (licenseLoading || (authLoading && (hasLicense || isActivated))) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
@@ -52,6 +73,14 @@ function AppContent() {
 
   if (!hasLicense && !isActivated) {
     return <ActivationPage onActivationSuccess={handleActivationSuccess} />;
+  }
+
+  if (authStatus && !authStatus.hasAdminAccount) {
+    return <AdminSetup onSetupComplete={handleSetupComplete} />;
+  }
+
+  if (authStatus && !authStatus.isAuthenticated) {
+    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
   }
 
   const style = {
