@@ -1,9 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { db } from "./db";
+import cron from "node-cron";
 
 const BACKUP_DIR = path.join(process.cwd(), "backups");
-const BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const MAX_BACKUPS = 7;
 
 async function ensureBackupDirectory() {
@@ -73,14 +73,18 @@ export async function createBackup() {
 }
 
 export function startBackupScheduler() {
-  console.log("🔄 Starting automatic backup scheduler (every 24 hours)");
+  console.log("🔄 Starting automatic backup scheduler (daily at midnight)");
   
   createBackup();
   
-  setInterval(async () => {
-    console.log("⏰ Running scheduled database backup...");
+  cron.schedule("0 0 * * *", async () => {
+    console.log("⏰ Running scheduled database backup (midnight)...");
     await createBackup();
-  }, BACKUP_INTERVAL);
+  }, {
+    timezone: "UTC"
+  });
+  
+  console.log("✅ Backup scheduler registered: Daily at 00:00 UTC");
 }
 
 export async function getBackupInfo() {
