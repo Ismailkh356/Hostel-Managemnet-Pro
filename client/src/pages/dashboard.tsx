@@ -1,9 +1,11 @@
 import { StatCard } from "@/components/stat-card";
-import { Users, Bed, DollarSign, CheckCircle } from "lucide-react";
+import { Users, Bed, DollarSign, CheckCircle, Bell } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import type { Tenant, Room } from "@shared/schema";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { data: tenants = [], isLoading: tenantsLoading } = useQuery<Tenant[]>({
@@ -26,6 +28,7 @@ export default function Dashboard() {
   
   const paidTenants = tenants.filter(t => t.payment_status === "Paid").length;
   const pendingTenants = tenants.filter(t => t.payment_status === "Pending").length;
+  const pendingRentTenants = tenants.filter(t => t.payment_status === "Pending" && t.status === "Active");
 
   const isLoading = tenantsLoading || roomsLoading;
 
@@ -128,6 +131,55 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Rent Reminders Section */}
+      {pendingRentTenants.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Bell className="h-5 w-5 text-yellow-600" />
+            Rent Payment Reminders
+          </h2>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {pendingRentTenants.length} {pendingRentTenants.length === 1 ? 'Tenant' : 'Tenants'} with Pending Rent
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingRentTenants.slice(0, 5).map((tenant) => (
+                  <div
+                    key={tenant.id}
+                    className="flex items-center justify-between p-3 rounded-md bg-muted/50 hover-elevate"
+                    data-testid={`reminder-tenant-${tenant.id}`}
+                  >
+                    <div>
+                      <p className="font-medium" data-testid={`reminder-name-${tenant.id}`}>
+                        {tenant.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Room {tenant.room_number} • ₨{tenant.rent.toFixed(2)}/month
+                      </p>
+                    </div>
+                    <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">
+                      Pending
+                    </Badge>
+                  </div>
+                ))}
+                {pendingRentTenants.length > 5 && (
+                  <div className="text-center pt-2">
+                    <Link href="/payments">
+                      <Button variant="outline" size="sm" data-testid="button-view-all-reminders">
+                        View All {pendingRentTenants.length} Pending Payments
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

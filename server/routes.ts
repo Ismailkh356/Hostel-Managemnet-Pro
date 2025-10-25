@@ -8,6 +8,7 @@ import {
   insertPaymentSchema 
 } from "@shared/schema";
 import { z } from "zod";
+import { createBackup, getBackupInfo } from "./backup";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Tenant Routes
@@ -366,6 +367,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resetting payments:", error);
       res.status(500).json({ error: "Failed to reset payments" });
+    }
+  });
+
+  // Backup Routes
+
+  // GET /api/backups - Get backup information
+  app.get("/api/backups", async (req, res) => {
+    try {
+      const backups = await getBackupInfo();
+      res.json(backups);
+    } catch (error) {
+      console.error("Error fetching backup info:", error);
+      res.status(500).json({ error: "Failed to fetch backup information" });
+    }
+  });
+
+  // POST /api/backups/create - Manually trigger a backup
+  app.post("/api/backups/create", async (req, res) => {
+    try {
+      const result = await createBackup();
+      
+      if (result.success) {
+        res.json({
+          message: "Backup created successfully",
+          fileName: result.fileName,
+          backupPath: result.backupPath
+        });
+      } else {
+        res.status(500).json({
+          error: "Failed to create backup",
+          details: result.error
+        });
+      }
+    } catch (error) {
+      console.error("Error creating backup:", error);
+      res.status(500).json({ error: "Failed to create backup" });
     }
   });
 
