@@ -247,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tenant Routes
   
   // GET /api/tenants - Get all tenants
-  app.get("/api/tenants", async (req, res) => {
+  app.get("/api/tenants", requireAuth, async (req, res) => {
     try {
       const tenants = storage.getAllTenants();
       res.json(tenants);
@@ -258,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tenants/:id - Get single tenant
-  app.get("/api/tenants/:id", async (req, res) => {
+  app.get("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenant = storage.getTenant(id);
@@ -275,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/tenants - Add new tenant
-  app.post("/api/tenants", async (req, res) => {
+  app.post("/api/tenants", requireAuth, async (req, res) => {
     try {
       // Validate request body
       const validatedData = insertTenantSchema.parse(req.body);
@@ -301,7 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/tenants/:id - Update tenant
-  app.put("/api/tenants/:id", async (req, res) => {
+  app.put("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -333,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/tenants/:id - Delete tenant
-  app.delete("/api/tenants/:id", async (req, res) => {
+  app.delete("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = storage.deleteTenant(id);
@@ -350,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/tenants/:id/mark-paid - Mark tenant payment as paid
-  app.put("/api/tenants/:id/mark-paid", async (req, res) => {
+  app.put("/api/tenants/:id/mark-paid", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const updatedTenant = storage.markTenantPaymentAsPaid(id);
@@ -370,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/tenants/:id/mark-pending - Mark tenant payment as pending
-  app.put("/api/tenants/:id/mark-pending", async (req, res) => {
+  app.put("/api/tenants/:id/mark-pending", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const updatedTenant = storage.markTenantPaymentAsPending(id);
@@ -392,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Room Routes
   
   // GET /api/rooms - Get all rooms
-  app.get("/api/rooms", async (req, res) => {
+  app.get("/api/rooms", requireAuth, async (req, res) => {
     try {
       const rooms = storage.getAllRooms();
       res.json(rooms);
@@ -403,7 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/rooms/:id - Get single room
-  app.get("/api/rooms/:id", async (req, res) => {
+  app.get("/api/rooms/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const room = storage.getRoom(id);
@@ -420,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/rooms - Add new room
-  app.post("/api/rooms", async (req, res) => {
+  app.post("/api/rooms", requireAuth, async (req, res) => {
     try {
       const validatedData = insertRoomSchema.parse(req.body);
       const newRoom = storage.createRoom(validatedData);
@@ -443,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/rooms/:id - Update room
-  app.put("/api/rooms/:id", async (req, res) => {
+  app.put("/api/rooms/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertRoomSchema.partial().parse(req.body);
@@ -471,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/rooms/:id - Delete room
-  app.delete("/api/rooms/:id", async (req, res) => {
+  app.delete("/api/rooms/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = storage.deleteRoom(id);
@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Settings Routes
   
   // GET /api/settings - Get settings
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", requireAuth, async (req, res) => {
     try {
       const settings = storage.getSettings();
       
@@ -506,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/settings - Update settings
-  app.put("/api/settings", async (req, res) => {
+  app.put("/api/settings", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSettingsSchema.partial().parse(req.body);
       const updatedSettings = storage.updateSettings(validatedData);
@@ -535,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment Routes
   
   // GET /api/payments - Get all payments
-  app.get("/api/payments", async (req, res) => {
+  app.get("/api/payments", requireAuth, async (req, res) => {
     try {
       const payments = storage.getAllPayments();
       res.json(payments);
@@ -546,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/payments - Add new payment
-  app.post("/api/payments", async (req, res) => {
+  app.post("/api/payments", requireAuth, async (req, res) => {
     try {
       const validatedData = insertPaymentSchema.parse(req.body);
       const newPayment = storage.createPayment(validatedData);
@@ -569,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/payments/:id/mark-paid - Mark payment as paid
-  app.put("/api/payments/:id/mark-paid", async (req, res) => {
+  app.put("/api/payments/:id/mark-paid", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const updatedPayment = storage.markPaymentAsPaid(id);
@@ -589,7 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/payments/reset-all - Reset all payments to pending
-  app.post("/api/payments/reset-all", async (req, res) => {
+  app.post("/api/payments/reset-all", requireAuth, async (req, res) => {
     try {
       const updatedCount = storage.resetAllPayments();
       
@@ -606,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Backup Routes
 
   // GET /api/backups - Get backup information
-  app.get("/api/backups", async (req, res) => {
+  app.get("/api/backups", requireAuth, async (req, res) => {
     try {
       const backups = await getBackupInfo();
       res.json(backups);
@@ -617,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/backups/create - Manually trigger a backup
-  app.post("/api/backups/create", async (req, res) => {
+  app.post("/api/backups/create", requireAuth, async (req, res) => {
     try {
       const result = await createBackup();
       
@@ -767,7 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/license/generate - Generate new license (admin only)
-  app.post("/api/license/generate", async (req, res) => {
+  app.post("/api/license/generate", requireAuth, async (req, res) => {
     try {
       const schema = z.object({
         customer_name: z.string(),
@@ -821,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/license/deactivate - Deactivate current license
-  app.post("/api/license/deactivate", async (req, res) => {
+  app.post("/api/license/deactivate", requireAuth, async (req, res) => {
     try {
       const schema = z.object({
         license_key: z.string(),
