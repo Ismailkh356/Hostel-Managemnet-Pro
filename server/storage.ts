@@ -3,7 +3,8 @@ import {
   type Room, type InsertRoom,
   type Settings, type InsertSettings,
   type Payment, type InsertPayment,
-  type License, type InsertLicense
+  type License, type InsertLicense,
+  type AdminUser, type InsertAdminUser
 } from "@shared/schema";
 import { db } from "./db";
 
@@ -44,6 +45,17 @@ export interface IStorage {
   activateLicense(licenseKey: string, machineIdHash: string, machineIdSalt: string): License | undefined;
   deactivateLicense(licenseKey: string): License | undefined;
   updateLicenseStatus(licenseKey: string, status: string): License | undefined;
+
+  // Admin user operations
+  getAdminByUsername(username: string): AdminUser | undefined;
+  getAdminById(id: number): AdminUser | undefined;
+  hasAdminAccount(): boolean;
+  createAdminUser(admin: InsertAdminUser): AdminUser;
+  updateAdminPassword(username: string, passwordHash: string): AdminUser | undefined;
+  incrementFailedLoginAttempts(username: string): AdminUser | undefined;
+  resetFailedLoginAttempts(username: string): AdminUser | undefined;
+  lockAdmin(username: string, lockUntil: string): AdminUser | undefined;
+  updateLastLogin(username: string): AdminUser | undefined;
 }
 
 export class SqliteStorage implements IStorage {
@@ -267,6 +279,69 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("UPDATE licenses SET status = @status WHERE license_key = @licenseKey");
     stmt.run({ licenseKey, status });
     return this.getLicenseByKey(licenseKey);
+  }
+
+  // Admin user operations
+  getAdminByUsername(username: string): AdminUser | undefined {
+    const stmt = db.prepare("SELECT * FROM admin_users WHERE username = ?");
+    return stmt.get(username) as AdminUser | undefined;
+  }
+
+  getAdminById(id: number): AdminUser | undefined {
+    const stmt = db.prepare("SELECT * FROM admin_users WHERE id = ?");
+    return stmt.get(id) as AdminUser | undefined;
+  }
+
+  hasAdminAccount(): boolean {
+    const stmt = db.prepare("SELECT COUNT(*) as count FROM admin_users");
+    const result = stmt.get() as { count: number };
+    return result.count > 0;
+  }
+
+  createAdminUser(admin: InsertAdminUser): AdminUser {
+    const stmt = db.prepare(`
+      INSERT INTO admin_users (username, password_hash)
+      VALUES (@username, @password_hash)
+    `);
+    
+    const info = stmt.run(admin);
+    const insertedAdmin = this.getAdminById(info.lastInsertRowid as number);
+    
+    if (!insertedAdmin) {
+      throw new Error("Failed to create admin user");
+    }
+    
+    return insertedAdmin;
+  }
+
+  updateAdminPassword(username: string, passwordHash: string): AdminUser | undefined {
+    const stmt = db.prepare("UPDATE admin_users SET password_hash = @passwordHash WHERE username = @username");
+    stmt.run({ username, passwordHash });
+    return this.getAdminByUsername(username);
+  }
+
+  incrementFailedLoginAttempts(username: string): AdminUser | undefined {
+    const stmt = db.prepare("UPDATE admin_users SET failed_login_attempts = failed_login_attempts + 1 WHERE username = @username");
+    stmt.run({ username });
+    return this.getAdminByUsername(username);
+  }
+
+  resetFailedLoginAttempts(username: string): AdminUser | undefined {
+    const stmt = db.prepare("UPDATE admin_users SET failed_login_attempts = 0, locked_until = NULL WHERE username = @username");
+    stmt.run({ username });
+    return this.getAdminByUsername(username);
+  }
+
+  lockAdmin(username: string, lockUntil: string): AdminUser | undefined {
+    const stmt = db.prepare("UPDATE admin_users SET locked_until = @lockUntil WHERE username = @username");
+    stmt.run({ username, lockUntil });
+    return this.getAdminByUsername(username);
+  }
+
+  updateLastLogin(username: string): AdminUser | undefined {
+    const stmt = db.prepare("UPDATE admin_users SET last_login = CURRENT_TIMESTAMP WHERE username = @username");
+    stmt.run({ username });
+    return this.getAdminByUsername(username);
   }
 }
 
