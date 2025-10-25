@@ -28,6 +28,19 @@ export function initializeDatabase() {
     )
   `);
 
+  // Admin users table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      last_login TEXT,
+      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT
+    )
+  `);
+
   // Tenants table - migrate to add occupation and payment_status if needed
   const tenantsTableExists = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='tenants'"

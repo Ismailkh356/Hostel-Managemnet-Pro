@@ -10,6 +10,16 @@ export const users = sqliteTable("users", {
   role: text("role").notNull().default("staff"),
 });
 
+export const adminUsers = sqliteTable("admin_users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  username: text("username").notNull().unique(),
+  password_hash: text("password_hash").notNull(),
+  created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+  last_login: text("last_login"),
+  failed_login_attempts: integer("failed_login_attempts").notNull().default(0),
+  locked_until: text("locked_until"),
+});
+
 export const tenants = sqliteTable("tenants", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -121,9 +131,20 @@ export const insertLicenseSchema = createInsertSchema(licenses).omit({
   activated_at: true,
 });
 
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
+  id: true,
+  created_at: true,
+  last_login: true,
+  failed_login_attempts: true,
+  locked_until: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type AdminUser = typeof adminUsers.$inferSelect;
 
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
