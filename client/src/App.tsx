@@ -12,6 +12,8 @@ import Dashboard from "@/pages/dashboard";
 import Rooms from "@/pages/rooms";
 import Guests from "@/pages/guests";
 import Payments from "@/pages/payments";
+import Staff from "@/pages/staff";
+import MaintenancePage from "@/pages/maintenance";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import ActivationPage from "@/pages/activation";
@@ -26,6 +28,8 @@ function Router() {
       <Route path="/rooms" component={Rooms} />
       <Route path="/guests" component={Guests} />
       <Route path="/payments" component={Payments} />
+      <Route path="/staff" component={Staff} />
+      <Route path="/maintenance" component={MaintenancePage} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

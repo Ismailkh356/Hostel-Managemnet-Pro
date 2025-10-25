@@ -7,7 +7,9 @@ import {
   insertSettingsSchema,
   insertPaymentSchema,
   insertLicenseSchema,
-  insertAdminUserSchema 
+  insertAdminUserSchema,
+  insertStaffSchema,
+  insertMaintenanceSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { createBackup, getBackupInfo } from "./backup";
@@ -600,6 +602,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resetting payments:", error);
       res.status(500).json({ error: "Failed to reset payments" });
+    }
+  });
+
+  // Staff Routes
+  
+  // GET /api/staff - Get all staff
+  app.get("/api/staff", requireAuth, async (req, res) => {
+    try {
+      const staff = storage.getAllStaff();
+      res.json(staff);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      res.status(500).json({ error: "Failed to fetch staff" });
+    }
+  });
+
+  // GET /api/staff/:id - Get single staff
+  app.get("/api/staff/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const staff = storage.getStaff(id);
+      
+      if (!staff) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+      
+      res.json(staff);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      res.status(500).json({ error: "Failed to fetch staff" });
+    }
+  });
+
+  // POST /api/staff - Add new staff
+  app.post("/api/staff", requireAuth, async (req, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertStaffSchema.parse(req.body);
+      
+      // Create staff
+      const newStaff = storage.createStaff(validatedData);
+      
+      res.status(201).json({
+        message: "Staff added successfully",
+        data: newStaff
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+      
+      console.error("Error creating staff:", error);
+      res.status(500).json({ error: "Failed to create staff" });
+    }
+  });
+
+  // PUT /api/staff/:id - Update staff
+  app.put("/api/staff/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate request body (partial update)
+      const validatedData = insertStaffSchema.partial().parse(req.body);
+      
+      // Update staff
+      const updatedStaff = storage.updateStaff(id, validatedData);
+      
+      if (!updatedStaff) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+      
+      res.json({
+        message: "Staff updated successfully",
+        data: updatedStaff
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+      
+      console.error("Error updating staff:", error);
+      res.status(500).json({ error: "Failed to update staff" });
+    }
+  });
+
+  // DELETE /api/staff/:id - Delete staff
+  app.delete("/api/staff/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = storage.deleteStaff(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+      
+      res.json({ message: "Staff deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      res.status(500).json({ error: "Failed to delete staff" });
+    }
+  });
+
+  // Maintenance Routes
+  
+  // GET /api/maintenance - Get all maintenance records
+  app.get("/api/maintenance", requireAuth, async (req, res) => {
+    try {
+      const maintenance = storage.getAllMaintenance();
+      res.json(maintenance);
+    } catch (error) {
+      console.error("Error fetching maintenance:", error);
+      res.status(500).json({ error: "Failed to fetch maintenance" });
+    }
+  });
+
+  // GET /api/maintenance/:id - Get single maintenance record
+  app.get("/api/maintenance/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const maintenance = storage.getMaintenance(id);
+      
+      if (!maintenance) {
+        return res.status(404).json({ error: "Maintenance record not found" });
+      }
+      
+      res.json(maintenance);
+    } catch (error) {
+      console.error("Error fetching maintenance:", error);
+      res.status(500).json({ error: "Failed to fetch maintenance" });
+    }
+  });
+
+  // POST /api/maintenance - Add new maintenance
+  app.post("/api/maintenance", requireAuth, async (req, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertMaintenanceSchema.parse(req.body);
+      
+      // Create maintenance
+      const newMaintenance = storage.createMaintenance(validatedData);
+      
+      res.status(201).json({
+        message: "Maintenance record added successfully",
+        data: newMaintenance
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+      
+      console.error("Error creating maintenance:", error);
+      res.status(500).json({ error: "Failed to create maintenance" });
+    }
+  });
+
+  // PUT /api/maintenance/:id - Update maintenance
+  app.put("/api/maintenance/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate request body (partial update)
+      const validatedData = insertMaintenanceSchema.partial().parse(req.body);
+      
+      // Update maintenance
+      const updatedMaintenance = storage.updateMaintenance(id, validatedData);
+      
+      if (!updatedMaintenance) {
+        return res.status(404).json({ error: "Maintenance record not found" });
+      }
+      
+      res.json({
+        message: "Maintenance record updated successfully",
+        data: updatedMaintenance
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: error.errors
+        });
+      }
+      
+      console.error("Error updating maintenance:", error);
+      res.status(500).json({ error: "Failed to update maintenance" });
+    }
+  });
+
+  // DELETE /api/maintenance/:id - Delete maintenance
+  app.delete("/api/maintenance/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = storage.deleteMaintenance(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Maintenance record not found" });
+      }
+      
+      res.json({ message: "Maintenance record deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting maintenance:", error);
+      res.status(500).json({ error: "Failed to delete maintenance" });
     }
   });
 

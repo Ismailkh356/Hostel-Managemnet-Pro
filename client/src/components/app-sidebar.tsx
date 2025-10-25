@@ -3,6 +3,8 @@ import {
   Bed, 
   Users, 
   Receipt,
+  UserCog,
+  Wrench,
   Settings
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -40,6 +42,16 @@ const menuItems = [
     title: "Payments",
     url: "/payments",
     icon: Receipt,
+  },
+  {
+    title: "Staff",
+    url: "/staff",
+    icon: UserCog,
+  },
+  {
+    title: "Maintenance",
+    url: "/maintenance",
+    icon: Wrench,
   },
   {
     title: "Settings",

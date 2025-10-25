@@ -19,10 +19,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Trash2 } from "lucide-react";
+import { Trash2, Edit } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { EditCustomerDialog } from "@/components/edit-customer-dialog";
 import type { Tenant } from "@shared/schema";
 
 interface CustomerDetailsDialogProps {
@@ -33,6 +34,7 @@ interface CustomerDetailsDialogProps {
 
 export function CustomerDetailsDialog({ customer, open, onOpenChange }: CustomerDetailsDialogProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const { toast } = useToast();
 
   const deleteTenantMutation = useMutation({
@@ -204,13 +206,26 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Customer
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                data-testid="button-close-details"
-              >
-                Close
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setShowEditDialog(true);
+                    onOpenChange(false);
+                  }}
+                  data-testid="button-edit-customer"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  data-testid="button-close-details"
+                >
+                  Close
+                </Button>
+              </div>
             </DialogFooter>
           </>
         ) : (
@@ -245,6 +260,13 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Customer Dialog */}
+      <EditCustomerDialog
+        customer={customer}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+      />
     </Dialog>
   );
 }

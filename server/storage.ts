@@ -4,7 +4,9 @@ import {
   type Settings, type InsertSettings,
   type Payment, type InsertPayment,
   type License, type InsertLicense,
-  type AdminUser, type InsertAdminUser
+  type AdminUser, type InsertAdminUser,
+  type Staff, type InsertStaff,
+  type Maintenance, type InsertMaintenance
 } from "@shared/schema";
 import { db } from "./db";
 
@@ -56,6 +58,20 @@ export interface IStorage {
   resetFailedLoginAttempts(username: string): AdminUser | undefined;
   lockAdmin(username: string, lockUntil: string): AdminUser | undefined;
   updateLastLogin(username: string): AdminUser | undefined;
+
+  // Staff operations
+  getStaff(id: number): Staff | undefined;
+  getAllStaff(): Staff[];
+  createStaff(staff: InsertStaff): Staff;
+  updateStaff(id: number, staff: Partial<InsertStaff>): Staff | undefined;
+  deleteStaff(id: number): boolean;
+
+  // Maintenance operations
+  getMaintenance(id: number): Maintenance | undefined;
+  getAllMaintenance(): Maintenance[];
+  createMaintenance(maintenance: InsertMaintenance): Maintenance;
+  updateMaintenance(id: number, maintenance: Partial<InsertMaintenance>): Maintenance | undefined;
+  deleteMaintenance(id: number): boolean;
 }
 
 export class SqliteStorage implements IStorage {
@@ -342,6 +358,88 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("UPDATE admin_users SET last_login = CURRENT_TIMESTAMP WHERE username = @username");
     stmt.run({ username });
     return this.getAdminByUsername(username);
+  }
+
+  // Staff operations
+  getStaff(id: number): Staff | undefined {
+    const stmt = db.prepare("SELECT * FROM staff WHERE id = ?");
+    return stmt.get(id) as Staff | undefined;
+  }
+
+  getAllStaff(): Staff[] {
+    const stmt = db.prepare("SELECT * FROM staff ORDER BY name");
+    return stmt.all() as Staff[];
+  }
+
+  createStaff(staff: InsertStaff): Staff {
+    const stmt = db.prepare(`
+      INSERT INTO staff (name, role, phone, salary, joined_at)
+      VALUES (@name, @role, @phone, @salary, @joined_at)
+    `);
+    
+    const info = stmt.run(staff);
+    const insertedStaff = this.getStaff(info.lastInsertRowid as number);
+    
+    if (!insertedStaff) {
+      throw new Error("Failed to create staff");
+    }
+    
+    return insertedStaff;
+  }
+
+  updateStaff(id: number, staff: Partial<InsertStaff>): Staff | undefined {
+    const fields = Object.keys(staff).map(key => `${key} = @${key}`).join(", ");
+    const stmt = db.prepare(`UPDATE staff SET ${fields} WHERE id = @id`);
+    
+    stmt.run({ ...staff, id });
+    return this.getStaff(id);
+  }
+
+  deleteStaff(id: number): boolean {
+    const stmt = db.prepare("DELETE FROM staff WHERE id = ?");
+    const info = stmt.run(id);
+    return info.changes > 0;
+  }
+
+  // Maintenance operations
+  getMaintenance(id: number): Maintenance | undefined {
+    const stmt = db.prepare("SELECT * FROM maintenance WHERE id = ?");
+    return stmt.get(id) as Maintenance | undefined;
+  }
+
+  getAllMaintenance(): Maintenance[] {
+    const stmt = db.prepare("SELECT * FROM maintenance ORDER BY date_reported DESC");
+    return stmt.all() as Maintenance[];
+  }
+
+  createMaintenance(maintenance: InsertMaintenance): Maintenance {
+    const stmt = db.prepare(`
+      INSERT INTO maintenance (room_id, issue, date_reported, status, remarks)
+      VALUES (@room_id, @issue, @date_reported, @status, @remarks)
+    `);
+    
+    const info = stmt.run(maintenance);
+    const insertedMaintenance = this.getMaintenance(info.lastInsertRowid as number);
+    
+    if (!insertedMaintenance) {
+      throw new Error("Failed to create maintenance");
+    }
+    
+    return insertedMaintenance;
+  }
+
+  updateMaintenance(id: number, maintenance: Partial<InsertMaintenance>): Maintenance | undefined {
+    const fields = Object.keys(maintenance).map(key => `${key} = @${key}`).join(", ");
+    const stmt = db.prepare(`UPDATE maintenance SET ${fields} WHERE id = @id`);
+    
+    stmt.run({ ...maintenance, id });
+    return this.getMaintenance(id);
+  }
+
+  deleteMaintenance(id: number): boolean {
+    const stmt = db.prepare("DELETE FROM maintenance WHERE id = ?");
+    const info = stmt.run(id);
+    return info.changes > 0;
   }
 }
 
