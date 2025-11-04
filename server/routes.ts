@@ -279,26 +279,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tenants - Add new tenant
   app.post("/api/tenants", requireAuth, async (req, res) => {
     try {
+      // Log incoming request body for debugging
+      console.log("Received tenant data:", req.body);
+
       // Validate request body
-      const validatedData = insertTenantSchema.parse(req.body);
+      const validatedData = insertTenantSchema.parse({
+        pending_dues: 0,
+        status: 'Active',
+        payment_status: 'Pending',
+        ...req.body
+      });
       
+      // Ensure rent is a number
+      if (typeof validatedData.rent === "string") {
+        validatedData.rent = parseFloat(validatedData.rent);
+      }
+
+      if (isNaN(validatedData.rent)) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: [{ path: ["rent"], message: "Rent must be a valid number" }]
+        });
+      }
+
       // Create tenant
       const newTenant = storage.createTenant(validatedData);
       
+      // Log successful creation
+      console.log("Tenant created successfully:", newTenant);
+
       res.status(201).json({
         message: "Tenant added successfully",
         data: newTenant
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", error.errors);
         return res.status(400).json({
           error: "Validation failed",
           details: error.errors
         });
       }
       
-      console.error("Error creating tenant:", error);
-      res.status(500).json({ error: "Failed to create tenant" });
+      // Log the full error for debugging
+      console.error("Detailed error creating tenant:", error);
+
+      // Check if it's a database constraint error
+      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+        return res.status(400).json({ 
+          error: "A tenant with this CNIC already exists" 
+        });
+      }
+
+      // Return more detailed error message
+      res.status(500).json({ 
+        error: "Failed to create tenant",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

@@ -41,13 +41,13 @@ export function initializeDatabase() {
     )
   `);
 
-  // Tenants table - migrate to add occupation and payment_status if needed
+  // Tenants table - migrate to add occupation, payment_status, and pending_dues if needed
   const tenantsTableExists = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='tenants'"
   ).get();
   
   if (tenantsTableExists) {
-    // Check if occupation column exists
+    // Check if columns exist
     const hasOccupation = db.prepare(
       "SELECT COUNT(*) as count FROM pragma_table_info('tenants') WHERE name='occupation'"
     ).get() as { count: number };
@@ -56,7 +56,11 @@ export function initializeDatabase() {
       "SELECT COUNT(*) as count FROM pragma_table_info('tenants') WHERE name='payment_status'"
     ).get() as { count: number };
     
-    if (hasOccupation.count === 0 || hasPaymentStatus.count === 0) {
+    const hasPendingDues = db.prepare(
+      "SELECT COUNT(*) as count FROM pragma_table_info('tenants') WHERE name='pending_dues'"
+    ).get() as { count: number };
+    
+    if (hasOccupation.count === 0 || hasPaymentStatus.count === 0 || hasPendingDues.count === 0) {
       // Migrate existing table
       db.exec(`
         CREATE TABLE tenants_new (
@@ -69,6 +73,7 @@ export function initializeDatabase() {
           occupation TEXT NOT NULL DEFAULT '',
           room_number TEXT NOT NULL,
           rent REAL NOT NULL,
+          pending_dues REAL NOT NULL DEFAULT 0,
           join_date TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'Active',
           payment_status TEXT NOT NULL DEFAULT 'Pending',
@@ -76,29 +81,32 @@ export function initializeDatabase() {
         )
       `);
       
-      // Copy data, setting defaults for new columns
-      if (hasOccupation.count === 0 && hasPaymentStatus.count === 0) {
-        db.exec(`
-          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
-          SELECT id, name, mobile_number, cnic, father_name, father_cnic, '', room_number, rent, join_date, status, 'Pending', created_at
-          FROM tenants
-        `);
-      } else if (hasOccupation.count === 0) {
-        db.exec(`
-          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
-          SELECT id, name, mobile_number, cnic, father_name, father_cnic, '', room_number, rent, join_date, status, payment_status, created_at
-          FROM tenants
-        `);
-      } else {
-        db.exec(`
-          INSERT INTO tenants_new (id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status, created_at)
-          SELECT id, name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, 'Pending', created_at
-          FROM tenants
-        `);
-      }
+      // Copy data with proper defaults
+      const columns = ['id', 'name', 'mobile_number', 'cnic', 'father_name', 'father_cnic'];
+      if (hasOccupation.count > 0) columns.push('occupation');
+      columns.push('room_number', 'rent');
+      if (hasPendingDues.count > 0) columns.push('pending_dues');
+      columns.push('join_date', 'status');
+      if (hasPaymentStatus.count > 0) columns.push('payment_status');
+      columns.push('created_at');
+      
+      const selectColumns = columns.map(col => {
+        if (col === 'occupation' && hasOccupation.count === 0) return "''";
+        if (col === 'payment_status' && hasPaymentStatus.count === 0) return "'Pending'";
+        if (col === 'pending_dues' && hasPendingDues.count === 0) return "0";
+        return col;
+      });
+      
+      db.exec(`
+        INSERT INTO tenants_new (${columns.join(', ')})
+        SELECT ${selectColumns.join(', ')}
+        FROM tenants
+      `);
       
       db.exec(`DROP TABLE tenants`);
       db.exec(`ALTER TABLE tenants_new RENAME TO tenants`);
+      
+      console.log("✅ Tenants table migrated with pending_dues column");
     }
   } else {
     db.exec(`
@@ -112,6 +120,7 @@ export function initializeDatabase() {
         occupation TEXT NOT NULL,
         room_number TEXT NOT NULL,
         rent REAL NOT NULL,
+        pending_dues REAL NOT NULL DEFAULT 0,
         join_date TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'Active',
         payment_status TEXT NOT NULL DEFAULT 'Pending',

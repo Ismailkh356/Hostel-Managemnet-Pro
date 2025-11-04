@@ -3,6 +3,8 @@ import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startBackupScheduler } from "./backup";
+import { isNewMonth, markMonthAsProcessed, getCurrentMonth } from "./month-tracker";
+import { storage } from "./storage";
 
 const app = express();
 
@@ -64,7 +66,37 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * Check for month-end and process tenant payments
+ * This runs once when the server starts
+ */
+function checkAndProcessMonthEnd() {
+  try {
+    if (isNewMonth()) {
+      const currentMonth = getCurrentMonth();
+      log(`📅 New month detected: ${currentMonth}`);
+      log("🔄 Processing month-end for all tenants...");
+      
+      const result = storage.processMonthEndForTenants();
+      
+      log(`✅ Month-end processing complete:`);
+      log(`   - ${result.processed} tenants reset to Pending (had paid)`);
+      log(`   - ${result.accumulated} tenants accumulated dues (had not paid)`);
+      
+      // Mark this month as processed
+      markMonthAsProcessed();
+    } else {
+      log(`✓ Month-end check: Current month already processed`);
+    }
+  } catch (error) {
+    console.error("❌ Error during month-end processing:", error);
+  }
+}
+
 (async () => {
+  // Check for month-end BEFORE starting the server
+  checkAndProcessMonthEnd();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -89,14 +121,10 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    
-    // Start automatic backup scheduler
+
+  server.listen(port, '127.0.0.1', () => {
+    log(`✅ Server running at http://127.0.0.1:${port}`);
     startBackupScheduler();
   });
+
 })();

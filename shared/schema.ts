@@ -30,6 +30,7 @@ export const tenants = sqliteTable("tenants", {
   occupation: text("occupation").notNull(),
   room_number: text("room_number").notNull(),
   rent: real("rent").notNull(),
+  pending_dues: real("pending_dues").notNull().default(0),
   join_date: text("join_date").notNull(),
   status: text("status").notNull().default("Active"),
   payment_status: text("payment_status").notNull().default("Pending"),

@@ -19,6 +19,7 @@ export interface IStorage {
   deleteTenant(id: number): boolean;
   markTenantPaymentAsPaid(id: number): Tenant | undefined;
   markTenantPaymentAsPending(id: number): Tenant | undefined;
+  processMonthEndForTenants(): { processed: number; accumulated: number };
 
   // Room operations
   getRoom(id: number): Room | undefined;
@@ -87,12 +88,28 @@ export class SqliteStorage implements IStorage {
   }
 
   createTenant(tenant: InsertTenant): Tenant {
+    // Ensure all required fields have defaults
+    const tenantWithDefaults = {
+      pending_dues: 0,
+      status: 'Active',
+      payment_status: 'Pending',
+      ...tenant
+    };
+
     const stmt = db.prepare(`
-      INSERT INTO tenants (name, mobile_number, cnic, father_name, father_cnic, occupation, room_number, rent, join_date, status, payment_status)
-      VALUES (@name, @mobile_number, @cnic, @father_name, @father_cnic, @occupation, @room_number, @rent, @join_date, @status, @payment_status)
+      INSERT INTO tenants (
+        name, mobile_number, cnic, father_name, father_cnic, 
+        occupation, room_number, rent, pending_dues, join_date, 
+        status, payment_status
+      )
+      VALUES (
+        @name, @mobile_number, @cnic, @father_name, @father_cnic,
+        @occupation, @room_number, @rent, @pending_dues, @join_date,
+        @status, @payment_status
+      )
     `);
     
-    const info = stmt.run(tenant);
+    const info = stmt.run(tenantWithDefaults);
     const insertedTenant = this.getTenant(info.lastInsertRowid as number);
     
     if (!insertedTenant) {
@@ -117,7 +134,8 @@ export class SqliteStorage implements IStorage {
   }
 
   markTenantPaymentAsPaid(id: number): Tenant | undefined {
-    const stmt = db.prepare("UPDATE tenants SET payment_status = 'Paid' WHERE id = ?");
+    // When marking as paid, also reset pending_dues to 0
+    const stmt = db.prepare("UPDATE tenants SET payment_status = 'Paid', pending_dues = 0 WHERE id = ?");
     stmt.run(id);
     return this.getTenant(id);
   }
@@ -126,6 +144,44 @@ export class SqliteStorage implements IStorage {
     const stmt = db.prepare("UPDATE tenants SET payment_status = 'Pending' WHERE id = ?");
     stmt.run(id);
     return this.getTenant(id);
+  }
+
+  /**
+   * Process month-end for all active tenants
+   * - If payment_status is 'Paid': Reset to 'Pending', keep pending_dues at 0
+   * - If payment_status is 'Pending': Keep as 'Pending', add rent to pending_dues
+   */
+  processMonthEndForTenants(): { processed: number; accumulated: number } {
+    let processed = 0;
+    let accumulated = 0;
+
+    // Get all active tenants
+    const tenants = db.prepare("SELECT * FROM tenants WHERE status = 'Active'").all() as Tenant[];
+
+    for (const tenant of tenants) {
+      if (tenant.payment_status === 'Paid') {
+        // Tenant paid last month, reset to Pending for new month
+        const stmt = db.prepare(`
+          UPDATE tenants 
+          SET payment_status = 'Pending', pending_dues = 0 
+          WHERE id = ?
+        `);
+        stmt.run(tenant.id);
+        processed++;
+      } else if (tenant.payment_status === 'Pending') {
+        // Tenant didn't pay, accumulate the rent to pending_dues
+        const newDues = (tenant.pending_dues || 0) + tenant.rent;
+        const stmt = db.prepare(`
+          UPDATE tenants 
+          SET pending_dues = ? 
+          WHERE id = ?
+        `);
+        stmt.run(newDues, tenant.id);
+        accumulated++;
+      }
+    }
+
+    return { processed, accumulated };
   }
 
   // Room operations
@@ -149,7 +205,7 @@ export class SqliteStorage implements IStorage {
     const insertedRoom = this.getRoom(info.lastInsertRowid as number);
     
     if (!insertedRoom) {
-      throw new Error("Failed to create room");
+      throw new Error("The Room is already Exist");
     }
     
     return insertedRoom;
