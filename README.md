@@ -1,4 +1,4 @@
-# 🏨 HostelPro Local - Hostel Management System with Monthley rew tenants
+# 🏨 HostelPro Local - Hostel Management System with Monthley renew tenants payments status
 
 A complete offline hostel management web application with license protection, admin authentication, and comprehensive tenant/payment management.
 
