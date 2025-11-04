@@ -1,4 +1,4 @@
-# 🏨 HostelPro Local - Hostel Management System
+# 🏨 HostelPro Local - Hostel Management System with Monthley rew tenants
 
 A complete offline hostel management web application with license protection, admin authentication, and comprehensive tenant/payment management.
 
@@ -6,7 +6,7 @@ A complete offline hostel management web application with license protection, ad
 
 ## 🚀 Quick Start (for VS Code / Local Setup)
 
-### Prerequisites
+### Prerequisites i mean requird packages etc
 - **Node.js** v18+ ([Download](https://nodejs.org/))
 - **npm** (comes with Node.js)
 
